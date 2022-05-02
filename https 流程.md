@@ -8,7 +8,7 @@
 
 ![](3.png)
 
-![](2.png)
+<img src="2.png" style="zoom:60%;" />
 
 ### 抓包工具
 
@@ -68,9 +68,13 @@ Client -> server ACK (Seq=1,Ack=1)
 
 ![1](1.png)
 
-https://segmentfault.com/a/1190000021494676
 
-https://www.runoob.com/w3cnote/http-vs-https.html
+
+
+
+
+
+
 
 然后开始TLS协议
 
@@ -202,7 +206,30 @@ Encrypted Handshake Message:
 
 ![](16.png)
 
+最后总结一下
 
+1. TCP的三次握手
+   
+
+2. Client Hello
+  
+3. Server Hello
+  
+4. Certificate
+  
+5. Server Key Exchange
+  
+6. Server Hello Done
+  
+7. Client Key Exchange
+  
+8. Change Cipher Spec
+  
+9. Encrypted Handshake Message
+   
+10. New Session Ticket
+    
+11. Application Data
 
 
 
