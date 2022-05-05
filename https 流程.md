@@ -1,5 +1,9 @@
 # https 流程
 
+分析前准备：
+
+
+
 ### 测试网站
 
 首先我在自己的服务器上部署了一个最简单的网页，https://www.gaotenglife.com/test.html，接下来分析https的流程都会通过抓取这个网址来进行，之所以网站里面只有一个test字符，也是为了分析方便，去掉复杂因素的干扰。
@@ -70,12 +74,6 @@ Client -> server ACK (Seq=1,Ack=1)
 
 
 
-
-
-
-
-
-
 然后开始TLS协议
 
 图中1
@@ -94,9 +92,13 @@ Client -> server ACK (Seq=1,Ack=1)
 
 我们重点看几个TLS协议中的字段。
 
-将Cipher Suites字段展开，如下图。 代表客户端支持的加密协议列表。我们拿第一个加密协议Cipher Suite: TLS_AES_128_GCM_SHA256 (0x1301)举例，可以从名字上看出，
+将Cipher Suites字段展开，如下图。 代表客户端支持的加密协议列表。
 
 ![](9.png)
+
+协议各个字段代表的含义如下：
+
+<img src="20.png" style="zoom: 33%;" />
 
 
 
@@ -110,7 +112,27 @@ Client -> server ACK (Seq=1,Ack=1)
 
 包裹的TCP中（Seq:1 Ack:518 Len:1436），到这里服务端连续发了两个消息，上面的135号，和现在的136。由于目前为止接受到客户端传来的消息总长度仍然是518，所以136号消息中，我们的ACK依然和135号中是一样的，也是518。
 
-服务端选择了加密协议，包含交换密钥使用的非对称加密算法，数据加密使用的对称密钥算法，数据校验的摘要算法(Cipher Suite: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (0xc02f))，这里详细概述。ECDHE_RSA：密钥协商交换算法，使用AES-128的GCM模式进行对称加密，同时以带SHA-256的RSA作为签名算法。
+服务端选择了加密协议，包含交换密钥使用的非对称加密算法，数据加密使用的对称密钥算法，数据校验的摘要算法(Cipher Suite: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (0xc02f))，这里详细概述。
+
+ECDHE:密钥协商交换算法，密钥协商的原理稍微复杂一些，早期我们使用RSA非对称加密进行密钥传输，这样导致一个问题，就是如果某台服务器的私钥万一泄漏。
+
+形象理解：
+
+https://xz.aliyun.com/t/2526
+
+
+
+
+
+RSA：签名算法，
+
+AES-128_GCM:使用AES-128的GCM模式进行对称加密
+
+_SHA256:数据摘要算法，即计算hash使用。
+
+
+
+
 
 <img src="8.png" style="zoom: 40%;" />
 
@@ -140,7 +162,9 @@ Server key Exchange:服务端将公钥参数传递给客户端
 
 ![](13.png)
 
-之前由于服务端选用ECDHE进行密钥协商，这里传输的内容有：椭圆曲线域参数，以及公钥的值。
+之前由于服务端选用ECDHE进行密钥协商，这里传输的内容有：
+
+椭圆曲线域参数，以及公钥的值。为了防止公钥被篡改，这里使用RSA对公钥进行签名。
 
 Server Hello Done:顾名思义，就是Server Hello消息结束
 
@@ -206,30 +230,49 @@ Encrypted Handshake Message:
 
 ![](16.png)
 
-最后总结一下
+最后总结一下，一次完整的Https请求所经历的报文请求。
 
 1. TCP的三次握手
    
 
-2. Client Hello
+2. Client Hello（Client）
   
-3. Server Hello
+
+3. Server Hello（Server）
   
-4. Certificate
+
+4. Certificate（Server）
   
-5. Server Key Exchange
+
+5. Server Key Exchange （Server）
   
-6. Server Hello Done
+
+6. Server Hello Done （Server）
   
-7. Client Key Exchange
+
+7. Client Key Exchange（Client）
   
-8. Change Cipher Spec
+
+8. Change Cipher Spec（Client）
   
-9. Encrypted Handshake Message
+
+9. Encrypted Handshake Message（Client）
+
    
-10. New Session Ticket
+
+10. New Session Ticket（Server）
+
     
-11. Application Data
+
+11. Change Cipher Spec（Server）
+
+    
+
+12. Encrypted Handshake Message（Server）
+
+    
+
+13. Application Data（Clinet,Server）
 
 
 
