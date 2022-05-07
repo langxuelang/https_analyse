@@ -1,8 +1,18 @@
 # https 流程
 
-分析前准备：
+Https介绍
+
+https其实是在http上加了一层(SSL/TSL)加密协议，根据维基百科的解释：
+
+> 超文本传输安全协议（英语：HyperText Transfer Protocol Secure，缩写：HTTPS；常称为HTTP over TLS、HTTP over SSL或HTTP Secure）是一种通过计算机网络进行安全通信的传输协议。
+>
+> HTTP协议和安全协议同属于应用层（OSI模型的最高层），具体来讲，安全协议工作在HTTP之下，传输层之上：安全协议向运行HTTP的进程提供一个类似于TCP的套接字，供进程向其中注入报文，安全协议将报文加密并注入运输层套接字；或是从运输层获取加密报文，解密后交给对应的进程。严格地讲，HTTPS并不是一个单独的协议，而是对工作在一加密连接（TLS或SSL）上的常规HTTP协议的称呼。
 
 
+
+我们用一张图来看看https的网络模型
+
+![](5.png)
 
 ### 测试网站
 
@@ -28,25 +38,9 @@
 
 ### https数据包分析
 
-Https介绍
-
-https其实是在http上加了一层(SSL/TSL)加密协议，根据维基百科的解释：
-
-> 超文本传输安全协议（英语：HyperText Transfer Protocol Secure，缩写：HTTPS；常称为HTTP over TLS、HTTP over SSL或HTTP Secure）是一种通过计算机网络进行安全通信的传输协议。
->
-> HTTP协议和安全协议同属于应用层（OSI模型的最高层），具体来讲，安全协议工作在HTTP之下，传输层之上：安全协议向运行HTTP的进程提供一个类似于TCP的套接字，供进程向其中注入报文，安全协议将报文加密并注入运输层套接字；或是从运输层获取加密报文，解密后交给对应的进程。严格地讲，HTTPS并不是一个单独的协议，而是对工作在一加密连接（TLS或SSL）上的常规HTTP协议的称呼。
-
-
-
-我们用一张图来看看https的网络模型
-
-![](5.png)
-
 Https整体流程图
 
 Https的流程分为两部分，首先是传统的tcp连接的三次握手与四次挥手，
-
-
 
 图再找找有否有更好的，或者自己画一张。
 
@@ -55,8 +49,6 @@ Https的流程分为两部分，首先是传统的tcp连接的三次握手与四
 
 
 接下来结合上图中的流程，我们从抓包的请求中，依次分析相应的数据包。
-
-
 
 首先经过tcp的三次握手
 
@@ -104,33 +96,41 @@ Client -> server ACK (Seq=1,Ack=1)
 
 第135号消息server->client  (Ack Seq=1 Ack=518)，则是服务端向客户端发送的ACK确认消息，代表上面的Client Hello已经收到。这里也可以看出服务端是通过普通的TCP 的ACK消息去应答Client Hello，看上图中，由于Client Hello 消息占用长度为517，所以回复的Ack就等于1+517 = 518，代表服务端从开始连接到目前已经收到了518序号。
 
-
-
 **server -> client (Server Hello)  **
-
-
 
 包裹的TCP中（Seq:1 Ack:518 Len:1436），到这里服务端连续发了两个消息，上面的135号，和现在的136。由于目前为止接受到客户端传来的消息总长度仍然是518，所以136号消息中，我们的ACK依然和135号中是一样的，也是518。
 
 服务端选择了加密协议，包含交换密钥使用的非对称加密算法，数据加密使用的对称密钥算法，数据校验的摘要算法(Cipher Suite: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (0xc02f))，这里详细概述。
 
-ECDHE:密钥协商交换算法，密钥协商的原理稍微复杂一些，早期我们使用RSA非对称加密进行密钥传输，这样导致一个问题，就是如果某台服务器的私钥万一泄漏。
+ECDHE（Elliptic Curve Diffie-Hellman Ephemeral）: ，密钥协商交换算法，密钥协商的原理稍微复杂一些，早期我们使用RSA非对称加密进行密钥传输，比如Cipher Suites列表中 TLS_RSA_WITH_AES_256_CBC_SHA 这个协议簇，使用RSA加密会导致一个问题，就是如果某台服务器的私钥万一泄漏，过去被第三方截获的所有 TLS 通讯密文都会被破解，即这种算法不支持“前向加密”。想要详细了解RSA密钥交换算法的原理，可以看文章：https://mp.weixin.qq.com/s/U9SRLE7jZTB6lUZ6c8gTKg
 
-形象理解：
+为了解决这种问题，就有了DH(Diffie-Hellman)密钥交换算法。而ECDHE也是基于DH算法进行了一些效率的改进。
+
+为了让我们的分析不陷入DH算法的细节中，我们只简单的使用一个例子来形象的说明下DH密钥交换算法的原理。
+
+想象一下，Alice和Bob正在做一些海报工作，他们的对手 Mallory也坐在替补席旁边。Alice和Bob想要达成共识，使用一种颜色来设计海报，他们无法大声讨论，因为Mallory会听到它。那么他们如何统一颜色呢？这个问题的解决方案就是Diffie-Hellman密钥交换算法的最简单形式，接下来我们来一探究竟。
+
+#### 方案步骤
+
+- 1.首先，Alice会选择一种常见的颜色，比如黄色，然后告诉Bob，她将在本次会议中使用黄色。显然，Mallory可以听到，但是没有关系。
+- 2.然后，Alice和Bob选择他们自己的秘密颜色，他们不会告诉对方。所以Mallory永远不会知道秘密颜色。例如，Alice选橙色作为秘密颜色，Bob选绿色。
+- 3.在这个步骤中，Alice将混合她的秘密颜色橙色和常用颜色黄色以产生新的颜色。凉鞋的颜色是可以吗？（我的颜色感觉不太好，原谅我。）
+- 4.同样，Bob也将他的秘密颜色与黄色混合以生成新的蓝色。
+- 5.Alice和Bob将告诉彼此这些新颜色。Mallory可以看到凉鞋颜色和蓝色，但不是他们的秘密颜色。
+- 6.交换完成后，Alice会将她的秘密颜色（橙色）混合到Bob发送的混合物中。Bob会将他的秘密颜色（绿色）与Alice发送的混合物混合。
+- 7.现在Alice和Bob都达到了一种共同秘密色彩的混合物。请参考下图。Mallory将会被凉鞋色和蓝色困住，因为Mallory不知道Alice和Bob的秘密颜色，所以他永远不会达到他们俩得到的共同的秘密颜色。
+
+![](21.png)
+
+这里，共同色（Yellow）可以被视为服务器的公钥，每个人都可以使用。最后获得的公共秘密可以被认为是用于在进一步的会话中加密数据的对称密钥，这不完全正确。
 
 https://xz.aliyun.com/t/2526
-
-
-
-
 
 RSA：签名算法，
 
 AES-128_GCM:使用AES-128的GCM模式进行对称加密
 
-_SHA256:数据摘要算法，即计算hash使用。
-
-
+SHA256:数据摘要算法，即计算hash使用。
 
 
 
@@ -152,11 +152,40 @@ Certificate: 3082052c30820414a00302010202120377859c9714b8a1ae... (id-at-commonNa
 
 Certificate: 308204653082034da0030201020210400175048314a4c821... (id-at-commonName=R3,id-at-organizationName=Let's Encrypt,id-at-countryName=US)
 
-有兴趣的同学，可以逐一将证书的各个字段展开，进行对比查看。（这里注意文末提供的抓包由于是早些时候抓取的，证书中的信息和目前网站中用chrome查看的信息是不一致的，如果需要统一，需要同学们自己抓去最新网站的包，来进行验证）
+有兴趣的同学，可以逐一将证书的各个字段展开，进行对比查看。
 
 <img src="11.png" style="zoom:50%;" />
 
 <img src="12.png" style="zoom:50%;" />
+
+
+
+说到这里，在简单介绍一下证书的构成。如上图，
+
+一个数字证书通常包含了：
+
+- 公钥；
+- 持有者信息；
+- 证书认证机构（CA）的信息；
+- CA 对这份文件的数字签名及使用的算法；
+- 证书有效期；
+- 还有一些其他额外信息；
+
+那数字证书的作用，是用来认证公钥持有者的身份，以防止第三方进行冒充。
+
+<img src="23.png" style="zoom:50%;" />
+
+​																						图10
+
+
+
+<img src="26.png" style="zoom:33%;" />
+
+上述截图中，encrypted:字段就是私钥加密后的Certificate Signature。我们也可以从chrome中证书查看工具中得到验证。
+
+<img src="25.png" style="zoom:33%;" />
+
+而图10中提到的用来解密的公钥，就是subjectPublickey字段下面的modulus字段。
 
 Server key Exchange:服务端将公钥参数传递给客户端
 
@@ -167,8 +196,6 @@ Server key Exchange:服务端将公钥参数传递给客户端
 椭圆曲线域参数，以及公钥的值。为了防止公钥被篡改，这里使用RSA对公钥进行签名。
 
 Server Hello Done:顾名思义，就是Server Hello消息结束
-
-
 
 接下来138号消息，客户端向服务端回复ACK，表示之前137号消息已经收到。
 
@@ -234,27 +261,26 @@ Encrypted Handshake Message:
 
 1. TCP的三次握手
    
-
 2. Client Hello（Client）
-  
+
 
 3. Server Hello（Server）
-  
+
 
 4. Certificate（Server）
-  
+
 
 5. Server Key Exchange （Server）
-  
+
 
 6. Server Hello Done （Server）
-  
+
 
 7. Client Key Exchange（Client）
-  
+
 
 8. Change Cipher Spec（Client）
-  
+
 
 9. Encrypted Handshake Message（Client）
 
@@ -274,7 +300,7 @@ Encrypted Handshake Message:
 
 13. Application Data（Clinet,Server）
 
-
+<img src="22.png" style="zoom:50%;" />
 
 附录：
 
