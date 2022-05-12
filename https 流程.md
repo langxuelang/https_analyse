@@ -14,11 +14,23 @@ https其实是在http上加了一层(SSL/TSL)加密协议，根据维基百科�
 
 ![](5.png)
 
+传统的HTTP由于是明文传输，所以有以下安全风险：
+
+* 数据被窃听：比如用户敏感信息被盗取，造成损失
+
+* 数据被篡改：如之前国内小的运营商经常会篡改网页，加入广告
+
+* 网站被冒充：由于没有身份认证体系，用户无法判断提供服务的网站是否是冒充
+
+而HTTPS通过加入(SSL/TSL)加密协议层，解决了上述三个风险。
+
+接下来将通过抓取一个测试网站的HTTPS数据包，通过Wireshark对每个数据包进行详细分析。
+
+本文的分析中，需要具备一些TCP/IP的基础知识。
+
 ### 测试网站
 
-首先我在自己的服务器上部署了一个最简单的网页，https://www.gaotenglife.com/test.html，接下来分析https的流程都会通过抓取这个网址来进行，之所以网站里面只有一个test字符，也是为了分析方便，去掉复杂因素的干扰。
-
-这个网站使用的https证书是Let's Encrypt提供的免费https证书，证书的详细信息，大家可以点开chrome浏览器左上角的按钮查看
+首先我在自己的服务器上部署了一个最简单的网页，https://www.gaotenglife.com/test.html，接下来分析https的流程都会通过抓取这个网址来进行，之所以网站里面只有一个test字符，也是为了分析方便，去掉复杂因素的干扰。一般的https证书都会收费，这里我使用国外一个提供免费https证书的服务商Let's Encrypt进行https证书的申请，证书的详细信息，大家可以点开chrome浏览器左上角的按钮查看。如需自己配置可参考：[Let's Encrypt](https://letsencrypt.org/zh-cn/getting-started/)
 
 ![](3.png)
 
@@ -28,11 +40,29 @@ https其实是在http上加了一层(SSL/TSL)加密协议，根据维基百科�
 
 在这里我们抓包工具使用Wireshark，这个工具是一个非常强大的网络抓包工具，可以用来分析各种底层协议。
 
-简单介绍一下这个工具。
+在这里提供一个之前内部的Wireshark的分享ppt，可以帮助大家快速了解这个抓包软件，PPT的下载链接也放到文末附录中。
 
-我将抓到的包放到文章末尾，如果大家抓包不方便，可以直接拿我抓的包进行分析。
+同时我将抓到的网络包放到文章末尾，如果大家抓包不方便，可以直接拿我抓的包进行分析。
 
 分析过程请大家过滤ip.addr == 121.42.204.194 and tcp.port==443，这样就能看到所有与服务器的https的数据包了。
+
+
+
+需要注意的是不同浏览器，或者不同的访问网站工具，对于https的具体实现可能有细微的差异。我这里使用的是mac系统下终端的crul命令行工具进行请求的。
+
+```html
+curl https://www.gaotenglife.com/test.html
+
+<html>
+
+test
+
+</html>
+```
+
+
+
+
 
 ![](4.png)
 
@@ -70,7 +100,7 @@ Client -> server ACK (Seq=1,Ack=1)
 
 图中1
 
-我们分析TLS协议从134号消息开始，到142号，也就是TSL从开始到可以发送数据的过程。
+我们分析TLS协议从24号消息开始，到39号结束，也就是TSL从开始到可以发送数据的过程。
 
 
 
@@ -94,13 +124,13 @@ Client -> server ACK (Seq=1,Ack=1)
 
 
 
-第135号消息server->client  (Ack Seq=1 Ack=518)，则是服务端向客户端发送的ACK确认消息，代表上面的Client Hello已经收到。这里也可以看出服务端是通过普通的TCP 的ACK消息去应答Client Hello，看上图中，由于Client Hello 消息占用长度为517，所以回复的Ack就等于1+517 = 518，代表服务端从开始连接到目前已经收到了518序号。
+第28号消息server->client  (Ack Seq=1 Ack=239)，则是服务端向客户端发送的ACK确认消息，代表上面的Client Hello已经收到。这里也可以看出服务端是通过普通的TCP 的ACK消息去应答Client Hello，看上图中，由于Client Hello 消息占用长度为238，所以回复的Ack就等于1+238 = 239，代表服务端从开始连接到目前已经收到了239序号。
 
 **server -> client (Server Hello)  **
 
-包裹的TCP中（Seq:1 Ack:518 Len:1436），到这里服务端连续发了两个消息，上面的135号，和现在的136。由于目前为止接受到客户端传来的消息总长度仍然是518，所以136号消息中，我们的ACK依然和135号中是一样的，也是518。
+<img src="8.png" style="zoom: 80%;" />
 
-服务端选择了加密协议，包含交换密钥使用的非对称加密算法，数据加密使用的对称密钥算法，数据校验的摘要算法(Cipher Suite: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (0xc02f))，这里详细概述。
+服务端选择了加密协议，包含交换密钥使用的非对称加密算法，数据加密使用的对称密钥算法，数据校验的摘要算法(Cipher Suite: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA384 (0xc030))，这里详细概述。
 
 ECDHE（Elliptic Curve Diffie-Hellman Ephemeral）: ，密钥协商交换算法，密钥协商的原理稍微复杂一些，早期我们使用RSA非对称加密进行密钥传输，比如Cipher Suites列表中 TLS_RSA_WITH_AES_256_CBC_SHA 这个协议簇，使用RSA加密会导致一个问题，就是如果某台服务器的私钥万一泄漏，过去被第三方截获的所有 TLS 通讯密文都会被破解，即这种算法不支持“前向加密”。想要详细了解RSA密钥交换算法的原理，可以看文章：https://mp.weixin.qq.com/s/U9SRLE7jZTB6lUZ6c8gTKg
 
@@ -129,37 +159,29 @@ RSA：签名算法，
 
 AES-128_GCM:使用AES-128的GCM模式进行对称加密
 
-SHA256:数据摘要算法，即计算hash使用。
-
-
-
-<img src="8.png" style="zoom: 40%;" />
+SHA384:数据摘要算法，即计算hash使用。可以看到这里使用比SHA256更多位数的SHA摘要算法。
 
 
 
 **server -> client (Certificate,Server key Exchange,Server Hello Done)**
 
-<img src="10.png" style="zoom:70%;" />
+<img src="10.png" style="zoom:60%;" />
 
 这里服务端在一个TCP消息中，发送了三个TSL消息。
 
-Certificate：将服务端的数字证书传递给客户端。我们可以点击chrome中查看证书，R3和下级的www.gaotenglife.com就对应于
-
-Certificate: 3082052c30820414a00302010202120377859c9714b8a1ae... (id-at-commonName=www.gaotenglife.com)
-
-和
-
-Certificate: 308204653082034da0030201020210400175048314a4c821... (id-at-commonName=R3,id-at-organizationName=Let's Encrypt,id-at-countryName=US)
+Certificates：将服务端的数字证书传递给客户端。里面包含了证书链中三个证书。
 
 有兴趣的同学，可以逐一将证书的各个字段展开，进行对比查看。
 
-<img src="11.png" style="zoom:50%;" />
-
-<img src="12.png" style="zoom:50%;" />
+<img src="12.png" style="zoom:70%;" />
 
 
 
-说到这里，在简单介绍一下证书的构成。如上图，
+<img src="11.png" style="zoom:80%;" />
+
+
+
+说到这里，这里简单介绍一下w w w.gaotenglife.com这个证书的构成。
 
 一个数字证书通常包含了：
 
@@ -178,11 +200,11 @@ Certificate: 308204653082034da0030201020210400175048314a4c821... (id-at-commonNa
 
 
 
-<img src="26.png" style="zoom:33%;" />
+<img src="26.png" style="zoom:80%;" />
 
 上述截图中，encrypted:字段就是私钥加密后的Certificate Signature。我们也可以从chrome中证书查看工具中得到验证。
 
-<img src="25.png" style="zoom:33%;" />
+<img src="25.png" style="zoom:80%;" />
 
 而图10中提到的用来解密的公钥，就是subjectPublickey字段下面的modulus字段。
 
@@ -196,11 +218,11 @@ Server key Exchange:服务端将公钥参数传递给客户端
 
 Server Hello Done:顾名思义，就是Server Hello消息结束
 
-接下来138号消息，客户端向服务端回复ACK，表示之前137号消息已经收到。
+
 
 **client -> server (Client Key Exchange, Change Cipher Spec, Encrypted Handshake Message)** 
 
-<img src="14.png" style="zoom:67%;" />
+<img src="14.png" style="zoom:70%;" />
 
 
 
@@ -224,15 +246,11 @@ Encrypted Handshake Message消息其实不光客户端会发送，之后服务�
 
 
 
-**server -> client (New Session Ticket, Change Cipher Spec, Encrypted Handshake Message)** 
+**server -> client (Change Cipher Spec, Encrypted Handshake Message)** 
 
 <img src="15.png" style="zoom:67%;" />
 
-这里可能大家有个小疑问，为啥139号消息（客户端发送的）发送后，服务端没有回复ACK呢，其实ACK是包含在140消息中，没有单独发送TCP消息了。从上图中也能看出，Ack：611就代表之前139号消息已经接受完毕。139号消息的Seq=518，len=93，加起来正好是611.
-
-New Session Ticket:
-
-这个消息的主要目的是服务端生成一个会话，并且设置一个超时时间（Session Ticket Lifetime Hint），在这段时间内，都可以使用杠杆协商交换好的对称密钥进行通信。
+这里可能大家有个小疑问，为啥36号消息（客户端发送的）发送后，服务端没有回复ACK呢，其实ACK是包含在37号消息中，没有单独发送TCP消息了。从上图中也能看出，Ack：332就代表之前36号消息已经接受完毕。36号消息的Seq=239，len=93，加起来正好是332.
 
 Change Cipher Spec:
 
@@ -244,15 +262,15 @@ Encrypted Handshake Message:
 
 
 
-最后141消息
+最后38消息
 
-141	10.353870	10.2.138.59	121.42.204.194	TCP	66	56456 → 443 [ACK] Seq=611 Ack=3138 Win=130752 Len=0 TSval=71526937 TSecr=1730183157
+38	6.446596	192.168.199.164	121.42.204.194	TCP	66	61175 → 443 [ACK] Seq=332 Ack=4513 Win=131008 Len=0 TSval=1331932702 TSecr=2029720832
 
-客户端给服务端使用TCP回复，也就是140的消息已经收到。
+客户端给服务端使用TCP回复，也就是37号消息已经收到。
 
 
 
-从142开始，便真正开始数据的传输，其中Encrypted Application Data就代表加密后的数据。
+从39号消息开始，便真正开始数据的传输，其中Encrypted Application Data就代表加密后的数据。
 
 ![](16.png)
 
@@ -283,25 +301,17 @@ Encrypted Handshake Message:
 
 9. Encrypted Handshake Message（Client）
 
-   
-
-10. New Session Ticket（Server）
-
-    
-
 11. Change Cipher Spec（Server）
 
-    
-
 12. Encrypted Handshake Message（Server）
-
-    
 
 13. Application Data（Clinet,Server）
 
 <img src="22.png" style="zoom:50%;" />
 
-附录：
+### 附录：
 
-文章中提到的抓包文件：[文件下载地址](http://qiniu.gaotenglife.com/gaotenglife.pcapng)
+* [Wireshark 使用说明](http://qiniu.gaotenglife.com/Wireshark%20%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E.pptx)
+
+* 文章中提到的网络抓包文件：[文件下载地址](http://qiniu.gaotenglife.com/gaotenglife_2022.pcapng)
 
