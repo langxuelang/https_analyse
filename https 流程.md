@@ -32,7 +32,7 @@ https其实是在http上加了一层(SSL/TSL)加密协议，根据维基百科�
 
 ### 测试网站
 
-首先我在自己的服务器上部署了一个最简单的网页，https://www.gaotenglife.com/test.html，接下来分析https的流程都会通过抓取这个网址来进行，之所以网站里面只有一个test字符，也是为了分析方便，去掉复杂因素的干扰。一般的https证书都会收费，这里我使用国外一个提供免费https证书的服务商Let's Encrypt进行https证书的申请，证书的详细信息，大家可以点开chrome浏览器左上角的按钮查看。如需自己配置可参考：[Let's Encrypt](https://letsencrypt.org/zh-cn/getting-started/)
+首先我在自己的服务器上部署了一个最简单的网页，https://www.gaotenglife.com/test.html ，接下来分析https的流程都会通过抓取这个网址来进行，之所以网站里面只有一个test字符，也是为了分析方便，去掉复杂因素的干扰。一般的https证书都会收费，这里我使用国外一个提供免费https证书的服务商Let's Encrypt进行https证书的申请，证书的详细信息，大家可以点开chrome浏览器左上角的按钮查看。如需自己配置可参考：[Let's Encrypt](https://letsencrypt.org/zh-cn/getting-started/)
 
 ![](3.png)
 
